@@ -1,0 +1,89 @@
+getgenv().Config = {
+    ["Pet_Remote_Name"] = "butterfly_2025_amber_butterfly"
+}
+
+local RS = game:GetService("ReplicatedStorage")
+local clientData = require(RS.ClientModules.Core.ClientData)
+local successCount = 0
+
+while true do
+    -- 🔁 Получаем актуальные данные
+    local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+    if not playerData then warn("playerData не найден") break end
+
+    -- 🧪 Получаем 4 age potion'а
+    local agePotions = {}
+    for _, item in pairs(playerData.inventory.food or {}) do
+        if item.kind == "pet_age_potion" then
+            table.insert(agePotions, item)
+            if #agePotions >= 4 then break end
+        end
+    end
+    if #agePotions < 4 then warn("Недостаточно age potion'ов") break end
+
+    -- 🐾 Ищем нужного пета
+    local petName = getgenv().Config["Pet_Remote_Name"]
+    local selectedPet = nil
+    for _, pet in pairs(playerData.inventory.pets or {}) do
+        if pet.kind == petName and pet.properties.age < 6 then
+            selectedPet = pet
+            break
+        end
+    end
+    if not selectedPet then warn("Нет подходящего пета") break end
+
+    -- 🛠 Экипируем пета и зелье
+    RS.API["ToolAPI/Equip"]:InvokeServer(selectedPet.unique, {
+        use_sound_delay = true,
+        equip_as_last = false
+    })
+    RS.API["ToolAPI/Equip"]:InvokeServer(agePotions[1].unique, {
+        use_sound_delay = true,
+        equip_as_last = false
+    })
+
+    task.wait()
+
+    -- 🧩 Проверка перед созданием
+    if not (agePotions[1] and agePotions[2] and agePotions[3] and agePotions[4] and selectedPet) then
+        warn("❌ Недействительные данные. Пропуск итерации.")
+        break
+    end
+
+    -- ✨ Пытаемся создать нового пета
+    local success, err = pcall(function()
+        RS.API["PetObjectAPI/CreatePetObject"]:InvokeServer(
+            "__Enum_PetObjectCreatorType_2",
+            {
+                additional_consume_uniques = {
+                    agePotions[1].unique,
+                    agePotions[2].unique,
+                    agePotions[3].unique
+                },
+                pet_unique = selectedPet.unique,
+                unique_id = agePotions[4].unique
+            }
+        )
+    end)
+
+    if not success then
+        warn("❌ Ошибка создания пета:", err)
+        break
+    end
+
+    task.wait(0.2)
+
+    -- 🍽 Кормим пета
+    local petModel = workspace:WaitForChild("PetObjects"):FindFirstChildWhichIsA("Model")
+    if petModel then
+        RS.API["PetAPI/ConsumeFoodObject"]:FireServer(petModel, selectedPet.unique)
+    else
+        warn("❗ Модель пета не найдена для кормления")
+    end
+
+    successCount += 1
+    print("✅ Успешно обработано петов: " .. successCount)
+
+    -- 🔄 Обновляем playerData для следующего круга
+    task.wait(0.4)
+end
