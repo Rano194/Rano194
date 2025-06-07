@@ -1,0 +1,70 @@
+getgenv().Config = {
+    ["Pet_Remote_Name"] = "butterfly_2025_amber_butterfly"
+}
+
+local clientData = require(game.ReplicatedStorage.ClientModules.Core.ClientData)
+local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+if not playerData then return warn("playerData не найден") end
+
+-- Получаем уникальные Age Potions
+local agePotions = {}
+for _, item in pairs(playerData.inventory.food or {}) do
+    if item.kind == "pet_age_potion" then
+        table.insert(agePotions, item)
+        if #agePotions >= 4 then break end
+    end
+end
+
+if #agePotions < 4 then return warn("Недостаточно age potion'ов") end
+
+-- Получаем 1 пета нужного типа, не Full Grown
+local petName = getgenv().Config["Pet_Remote_Name"]
+local selectedPet = nil
+for _, pet in pairs(playerData.inventory.pets or {}) do
+    if pet.kind == petName and pet.properties.age < 6 then
+        selectedPet = pet
+        break
+    end
+end
+
+if not selectedPet then return error("Нет подходящего пета") end
+
+-- Экипируем пета
+game.ReplicatedStorage.API["ToolAPI/Equip"]:InvokeServer(selectedPet.unique, {
+    use_sound_delay = true,
+    equip_as_last = false
+})
+
+-- Экипируем 1 зелье
+game.ReplicatedStorage.API["ToolAPI/Equip"]:InvokeServer(agePotions[1].unique, {
+    use_sound_delay = true,
+    equip_as_last = false
+})
+
+task.wait(5)
+
+-- Объединение
+game.ReplicatedStorage.API["PetObjectAPI/CreatePetObject"]:InvokeServer(
+    "__Enum_PetObjectCreatorType_2",
+    {
+        additional_consume_uniques = {
+            agePotions[1].unique,
+            agePotions[2].unique,
+            agePotions[3].unique
+        },
+        pet_unique = selectedPet.unique,
+        unique_id = agePotions[4].unique
+    }
+)
+task.wait(1)
+local RS = game:GetService("ReplicatedStorage")
+
+-- Берём первого пета в мире
+local petModel = workspace.PetObjects:FindFirstChildWhichIsA("Model")
+
+-- Если модель есть, кормим
+if petModel and selectedPet then
+    RS.API["PetAPI/ConsumeFoodObject"]:FireServer(petModel, selectedPet.unique)
+else
+    warn("Пет или модель не найдены")
+end
