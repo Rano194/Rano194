@@ -1,0 +1,9 @@
+local dehash = function()
+    local function rename(remotename,hashedremote)
+        hashedremote.Name = remotename
+    end
+    
+    table.foreach(getupvalue(require(game:GetService("ReplicatedStorage").ClientModules.Core.RouterClient.RouterClient).init,7),rename)
+end
+
+dehash()
