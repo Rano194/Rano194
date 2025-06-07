@@ -1,0 +1,140 @@
+-- Загрузка библиотеки
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI/main/UI_Template_1"))()
+local Window = Library.CreateLib("Pet Booster", "RJTheme3")
+
+-- Таб и секция
+local Tab = Window:NewTab("Прокачка")
+local Section = Tab:NewSection("Управление")
+
+-- Переменные
+local RS = game:GetService("ReplicatedStorage")
+local clientData = require(RS.ClientModules.Core.ClientData)
+local player = game.Players.LocalPlayer
+
+local selectedKind = nil
+local boosting = false
+
+-- Получить список всех видов петов
+local function getPetKinds()
+	local playerData = clientData.get_data()[tostring(player)]
+	if not playerData then return {} end
+
+	local petKinds = {}
+	local countMap = {}
+
+	for _, pet in pairs(playerData.inventory.pets or {}) do
+		local kind = pet.kind
+		countMap[kind] = (countMap[kind] or 0) + 1
+	end
+
+	for kind, count in pairs(countMap) do
+		table.insert(petKinds, kind .. " (" .. count .. ")")
+	end
+
+	return petKinds
+end
+
+-- Dropdown: выбрать пета
+Section:NewDropdown("Выбери пета", "Прокачивается до Full Grown", getPetKinds(), function(option)
+	selectedKind = option:match("^(.-) %(") -- убираем скобки
+	print("Выбран питомец: " .. selectedKind)
+end)
+
+-- Главный Boost цикл
+local function boostLoop()
+	while boosting do
+		local playerData = clientData.get_data()[tostring(player)]
+		if not playerData then warn("Данные не найдены") break end
+
+		-- 1. Найдём age potion
+		local agePotions = {}
+		for _, item in pairs(playerData.inventory.food or {}) do
+			if item.kind == "pet_age_potion" then
+				table.insert(agePotions, item)
+				if #agePotions >= 4 then break end
+			end
+		end
+		if #agePotions < 4 then
+			warn("Недостаточно зелий")
+			break
+		end
+
+		-- 2. Найдём пета с age < 6
+		local selectedPet = nil
+		for _, pet in pairs(playerData.inventory.pets or {}) do
+			if pet.kind == selectedKind and pet.properties.age < 6 then
+				selectedPet = pet
+				break
+			end
+		end
+		if not selectedPet then
+			warn("Нет не full-grown петов")
+			break
+		end
+
+		-- 3. Экипировка
+		RS.API["ToolAPI/Equip"]:InvokeServer(selectedPet.unique, {
+			use_sound_delay = true,
+			equip_as_last = false
+		})
+		RS.API["ToolAPI/Equip"]:InvokeServer(agePotions[1].unique, {
+			use_sound_delay = true,
+			equip_as_last = false
+		})
+
+		task.wait(0.2)
+
+		-- 4. Прокачка (CreatePetObject)
+		local success, err = pcall(function()
+			RS.API["PetObjectAPI/CreatePetObject"]:InvokeServer(
+				"__Enum_PetObjectCreatorType_2",
+				{
+					additional_consume_uniques = {
+						agePotions[1].unique,
+						agePotions[2].unique,
+						agePotions[3].unique
+					},
+					pet_unique = selectedPet.unique,
+					unique_id = agePotions[4].unique
+				}
+		 )
+		end)
+
+		if not success then
+			warn("Ошибка прокачки: " .. tostring(err))
+			break
+		end
+
+		task.wait(0.2)
+
+		-- 5. Кормление
+		local petModel = workspace.PetObjects:FindFirstChildWhichIsA("Model")
+		if petModel then
+			RS.API["PetAPI/ConsumeFoodObject"]:FireServer(petModel, selectedPet.unique)
+		end
+
+		print("✅ Прокачан: " .. selectedPet.kind .. " (" .. selectedPet.unique .. ")")
+		task.wait(0.4)
+	end
+end
+
+-- Кнопка запуска
+Section:NewButton("▶️ Включить Boost", "Прокачивает выбранного пета", function()
+	if not selectedKind then
+		warn("Сначала выбери пета")
+		return
+	end
+	if boosting then
+		warn("Boost уже работает")
+		return
+	end
+
+	boosting = true
+	task.spawn(boostLoop)
+end)
+
+-- Кнопка остановки
+Section:NewButton("⛔ Остановить Boost", "Останавливает прокачку", function()
+	boosting = false
+	print("Boost остановлен")
+end)
