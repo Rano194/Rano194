@@ -1,0 +1,71 @@
+getgenv().Config = {
+    ["Pet_Remote_Name"] = "butterfly_2025_amber_butterfly"
+}
+
+local RS = game:GetService("ReplicatedStorage")
+local clientData = require(RS.ClientModules.Core.ClientData)
+
+while true do
+    -- 🟩 Обновляем данные в начале каждого цикла
+    local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+    if not playerData then warn("playerData не найден") break end
+
+    -- 🧪 Сканируем зелья
+    local agePotions = {}
+    for _, item in pairs(playerData.inventory.food or {}) do
+        if item.kind == "pet_age_potion" then
+            table.insert(agePotions, item)
+            if #agePotions >= 4 then break end
+        end
+    end
+    if #agePotions < 4 then warn("Недостаточно age potion'ов") break end
+
+    -- 🐾 Ищем пета, не full-grown
+    local petName = getgenv().Config["Pet_Remote_Name"]
+    local selectedPet = nil
+    for _, pet in pairs(playerData.inventory.pets or {}) do
+        if pet.kind == petName and pet.properties.age < 6 then
+            selectedPet = pet
+            break
+        end
+    end
+    if not selectedPet then warn("Нет подходящего пета") break end
+
+    -- 🛠 Экипируем пета и зелье
+    RS.API["ToolAPI/Equip"]:InvokeServer(selectedPet.unique, {
+        use_sound_delay = true,
+        equip_as_last = false
+    })
+    RS.API["ToolAPI/Equip"]:InvokeServer(agePotions[1].unique, {
+        use_sound_delay = true,
+        equip_as_last = false
+    })
+
+    task.wait()
+
+    -- ✨ Создаём
+    RS.API["PetObjectAPI/CreatePetObject"]:InvokeServer(
+        "__Enum_PetObjectCreatorType_2",
+        {
+            additional_consume_uniques = {
+                agePotions[1].unique,
+                agePotions[2].unique,
+                agePotions[3].unique
+            },
+            pet_unique = selectedPet.unique,
+            unique_id = agePotions[4].unique
+        }
+    )
+
+    task.wait()
+
+    -- 🍽 Кормим
+    local petModel = workspace.PetObjects:FindFirstChildWhichIsA("Model")
+    if petModel then
+        RS.API["PetAPI/ConsumeFoodObject"]:FireServer(petModel, selectedPet.unique)
+    else
+        warn("Модель пета не найдена для кормления")
+    end
+
+    task.wait(0.3)
+end
