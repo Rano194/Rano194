@@ -1,0 +1,46 @@
+local clientData = require(game.ReplicatedStorage.ClientModules.Core.ClientData)
+local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+
+if playerData and playerData.inventory and playerData.inventory.food then
+    for _, item in pairs(playerData.inventory.food) do
+        local kind = item.kind
+        local unique = item.unique
+
+        if kind == "butterfly_2025_bluebell_flower" then
+            local args1 = {
+	            unique,
+	            {
+		            use_sound_delay = true,
+		            equip_as_last = false
+	            }
+            }
+            game.ReplicatedStorage.API["ToolAPI/Equip"]:InvokeServer(unpack(args1))
+
+            task.wait() -- минимум 1 кадр
+
+            local args2 = {
+	            unique,
+	            "START"
+            }
+            game.ReplicatedStorage.API["ToolAPI/ServerUseTool"]:FireServer(unpack(args2))
+
+            task.wait()
+
+            local args3 = {
+	            "butterfly_2025_bluebell_flower",
+	            unique
+            }
+            game.ReplicatedStorage.API["LootBoxAPI/ExchangeItemForReward"]:InvokeServer(unpack(args3))
+
+            task.wait()
+
+            local args4 = {
+	            unique,
+	            "END"
+            }
+            game.ReplicatedStorage.API["ToolAPI/ServerUseTool"]:FireServer(unpack(args4))
+        end
+    end
+else
+    warn("Player inventory data is missing or malformed")
+end
