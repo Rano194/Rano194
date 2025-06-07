@@ -1,0 +1,156 @@
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local clientData = require(RS.ClientModules.Core.ClientData)
+
+local player = Players.LocalPlayer
+local boosting = false
+local selectedPet = nil
+
+-- Создаём экран GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "PetBoostGui"
+
+-- Кнопка открытия
+local openButton = Instance.new("TextButton", screenGui)
+openButton.Size = UDim2.new(0, 150, 0, 40)
+openButton.Position = UDim2.new(0, 10, 0, 10)
+openButton.Text = "Открыть меню"
+
+-- Фрейм со списком петов
+local petFrame = Instance.new("Frame", screenGui)
+petFrame.Size = UDim2.new(0, 300, 0, 400)
+petFrame.Position = UDim2.new(0, 10, 0, 60)
+petFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+petFrame.Visible = false
+
+-- Скролл для петов
+local scroll = Instance.new("ScrollingFrame", petFrame)
+scroll.Size = UDim2.new(1, 0, 1, -60)
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.BackgroundTransparency = 1
+
+-- Label с выбранным
+local selectedLabel = Instance.new("TextLabel", petFrame)
+selectedLabel.Size = UDim2.new(1, 0, 0, 30)
+selectedLabel.Position = UDim2.new(0, 0, 1, -60)
+selectedLabel.Text = "Выбран: —"
+selectedLabel.BackgroundTransparency = 1
+selectedLabel.TextColor3 = Color3.new(1, 1, 1)
+
+-- Кнопка Boost
+local boostButton = Instance.new("TextButton", petFrame)
+boostButton.Size = UDim2.new(1, 0, 0, 30)
+boostButton.Position = UDim2.new(0, 0, 1, -30)
+boostButton.Text = "Включить Boost"
+boostButton.BackgroundColor3 = Color3.new(0.3, 0.6, 0.3)
+boostButton.TextColor3 = Color3.new(1, 1, 1)
+
+-- Открыть/скрыть GUI
+openButton.MouseButton1Click:Connect(function()
+    petFrame.Visible = not petFrame.Visible
+end)
+
+-- Загрузить петов
+local function loadPets()
+    scroll:ClearAllChildren()
+    local playerData = clientData.get_data()[tostring(player)]
+    local pets = playerData and playerData.inventory and playerData.inventory.pets or {}
+    local y = 0
+
+    for _, pet in pairs(pets) do
+        local btn = Instance.new("TextButton", scroll)
+        btn.Size = UDim2.new(1, -10, 0, 30)
+        btn.Position = UDim2.new(0, 5, 0, y)
+        btn.Text = pet.kind .. " (" .. (pet.unique or "нет ID") .. ")"
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.BackgroundColor3 = Color3.new(0.2, 0.4, 0.6)
+
+        btn.MouseButton1Click:Connect(function()
+            selectedPet = pet
+            selectedLabel.Text = "Выбран: " .. pet.kind
+        end)
+
+        y += 35
+    end
+
+    scroll.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+-- Boost функция
+local function boostLoop()
+    while boosting do
+        local playerData = clientData.get_data()[tostring(player)]
+        if not selectedPet then
+            warn("Пет не выбран")
+            break
+        end
+
+        -- Найдём зелья
+        local agePotions = {}
+        for _, item in pairs(playerData.inventory.food or {}) do
+            if item.kind == "pet_age_potion" then
+                table.insert(agePotions, item)
+                if #agePotions >= 4 then break end
+            end
+        end
+        if #agePotions < 4 then
+            warn("Недостаточно age potion")
+            break
+        end
+
+        -- Экипировка
+        RS.API["ToolAPI/Equip"]:InvokeServer(selectedPet.unique, {
+            use_sound_delay = true,
+            equip_as_last = false
+        })
+        RS.API["ToolAPI/Equip"]:InvokeServer(agePotions[1].unique, {
+            use_sound_delay = true,
+            equip_as_last = false
+        })
+
+        task.wait()
+
+        -- Слияние
+        RS.API["PetObjectAPI/CreatePetObject"]:InvokeServer(
+            "__Enum_PetObjectCreatorType_2",
+            {
+                additional_consume_uniques = {
+                    agePotions[1].unique,
+                    agePotions[2].unique,
+                    agePotions[3].unique
+                },
+                pet_unique = selectedPet.unique,
+                unique_id = agePotions[4].unique
+            }
+        )
+
+        task.wait()
+
+        -- Кормим
+        local petModel = workspace.PetObjects:FindFirstChildWhichIsA("Model")
+        if petModel then
+            RS.API["PetAPI/ConsumeFoodObject"]:FireServer(petModel, selectedPet.unique)
+        end
+
+        task.wait(0.3)
+    end
+end
+
+-- Переключение Boost
+boostButton.MouseButton1Click:Connect(function()
+    if not selectedPet then
+        warn("Сначала выбери пета")
+        return
+    end
+
+    boosting = not boosting
+    boostButton.Text = boosting and "Выключить Boost" or "Включить Boost"
+    boostButton.BackgroundColor3 = boosting and Color3.new(0.6, 0.2, 0.2) or Color3.new(0.3, 0.6, 0.3)
+
+    if boosting then
+        task.spawn(boostLoop)
+    end
+end)
+
+-- Загружаем питомцев при запуске
+loadPets()
