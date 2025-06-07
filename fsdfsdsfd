@@ -1,0 +1,95 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI_Library/main/UI_Template_1"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Rano194/Rano194/refs/heads/main/Dehash"))()
+local Window = Library.CreateLib("Adopt Me Tools | fsocietyfarm", "RJTheme7")
+
+
+local PetsTab = Window:NewTab("Pets")
+local TradeTab = Window:NewTab("Trade")
+
+local clientData = require(game:GetService("ReplicatedStorage").ClientModules.Core.ClientData)
+local player = game.Players.LocalPlayer
+local playerData = clientData.get_data()[tostring(player)]
+local pets = playerData and playerData.inventory and playerData.inventory.pets or {}
+
+local age_potion_vusial = 0
+
+for _, item in pairs(playerData.inventory.food or {}) do
+    if item.kind == "pet_age_potion" then
+        age_potion_vusial += 1
+    end
+end
+
+local PetsSection = PetsTab:NewSection("🧪 Potions: ".. age_potion_vusial)
+
+local petCount = {}
+
+for _, pet in pairs(pets) do
+    local kind = pet.kind
+    petCount[kind] = (petCount[kind] or 0) + 1
+end
+
+local dropdownList = {}
+
+for kind, count in pairs(petCount) do
+    table.insert(dropdownList, kind .. " (" .. count .. ")")
+end
+
+local petName = nil
+
+PetsSection:NewDropdown("Select Pets", "Select Pets", dropdownList, function(currentOption)
+    petName = currentOption:match("^(.-) %(")
+end)
+
+PetsSection:NewButton("Auto Give Potion", "Auto Give Potion", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Rano194/Rano194/refs/heads/main/gui33"))()
+end)
+
+PetsSection:NewButton("Auto Open Event Case", "Auto Open Event Case", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Rano194/Rano194/refs/heads/main/dfads"))()
+end)
+
+local TradeSection = TradeTab:NewSection("Auto Trade")
+
+local NickName = nil
+
+TradeSection:NewTextBox("NickName", "NickName", function(NickName)
+	NickName = NickName
+end)
+
+local isTrading = false
+
+TradeSection:NewToggle("Auto Trade", "Auto Trade", function(state)
+	isTrading = state
+
+	if state then
+		task.spawn(function()
+			while isTrading do
+				-- Проверка, открыт ли трейд
+				local tradeUI = Players.LocalPlayer:FindFirstChild("PlayerGui") and
+					Players.LocalPlayer.PlayerGui:FindFirstChild("TradeApp") and
+					Players.LocalPlayer.PlayerGui.TradeApp:FindFirstChild("Frame")
+
+				if tradeUI then
+					-- Получаем всех петов игрока
+					local playerData = clientData.get_data()[tostring(Players.LocalPlayer)]
+					local pets = playerData and playerData.inventory and playerData.inventory.pets or {}
+
+					local count = 0
+					for _, pet in pairs(pets) do
+						if pet.kind == PetName then
+							local args = {pet.unique}
+							RS.API["TradeAPI/AddItemToOffer"]:FireServer(unpack(args))
+							count += 1
+							if count >= 18 then break end
+							task.wait(0.1)
+						end
+					end
+				end
+
+				task.wait(1)
+			end
+		end)
+	else
+		print("Auto Trade отключен")
+	end
+end)
