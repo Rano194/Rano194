@@ -1,0 +1,92 @@
+-- Загрузка библиотеки
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI/main/UI_Template_1"))()
+local Window = Library.CreateLib("Pet Booster", "RJTheme3")
+
+-- Таб и секция
+local Tab = Window:NewTab("Прокачка")
+local Section = Tab:NewSection("Управление")
+
+-- Переменные
+local RS = game:GetService("ReplicatedStorage")
+local clientData = require(RS.ClientModules.Core.ClientData)
+local selectedKind = nil
+local boosting = false
+
+-- Получение подходящих петов
+local function getValidPets()
+	local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+	if not playerData then return {} end
+	local result = {}
+
+	for _, pet in pairs(playerData.inventory.pets or {}) do
+		if pet.properties.age == 6 and not pet.properties.neon then
+			if not result[pet.kind] then
+				result[pet.kind] = {}
+			end
+			table.insert(result[pet.kind], pet.unique)
+		end
+	end
+
+	return result
+end
+
+-- Обновим дропдаун
+local kindOptions = {}
+local petMap = getValidPets()
+for kind, pets in pairs(petMap) do
+	table.insert(kindOptions, kind .. " (" .. #pets .. ")")
+end
+
+-- Дропдаун
+Section:NewDropdown("Выбери пета", "Петы с уровнем 6 без Neon", kindOptions, function(option)
+	selectedKind = option:match("^(.-) %(") -- удалим (X)
+	print("Выбран: " .. selectedKind)
+end)
+
+-- Функция для отправки 4 петов в слияние
+local function sendFusion(petIDs)
+	local args = {
+		{
+			petIDs[1],
+			petIDs[2],
+			petIDs[3],
+			petIDs[4]
+		}
+	}
+	RS.API["PetAPI/DoNeonFusion"]:InvokeServer(unpack(args))
+end
+
+-- Boost процесс
+local function startBoost()
+	while boosting do
+		local petMap = getValidPets()
+		local pets = petMap[selectedKind]
+
+		if not pets or #pets < 4 then
+			warn("Недостаточно петов для: " .. tostring(selectedKind))
+			break
+		end
+
+		local batch = {pets[1], pets[2], pets[3], pets[4]}
+		sendFusion(batch)
+		print("Слияние:", table.concat(batch, ", "))
+
+		task.wait(0.5)
+	end
+end
+
+-- Кнопка запуска
+Section:NewButton("▶️ Запустить Boost", "Сливает петов 6 лвл без Neon", function()
+	if not selectedKind then
+		warn("Сначала выбери пета")
+		return
+	end
+	boosting = true
+	task.spawn(startBoost)
+end)
+
+-- Кнопка остановки
+Section:NewButton("⛔ Остановить Boost", "Прекратить прокачку", function()
+	boosting = false
+	print("Boost остановлен")
+end)
