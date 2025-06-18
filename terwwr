@@ -1,0 +1,63 @@
+-- Main account
+
+getgenv().Config = {
+["PetName"] = "winter_2024_frostclaw",
+["RarityCountPotionTooMega"] = "200"
+}
+
+-- Dehash script
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Rano194/Rano194/refs/heads/main/Dehash"))()
+print("[INFO] loading dehash")
+
+-- getting pets
+local clientData = require(game.ReplicatedStorage.ClientModules.Core.ClientData)
+local playerData = clientData.get_data()[tostring(game.Players.LocalPlayer)]
+
+local petName = getgenv().Config["PetName"]
+local count = 0
+for _, pet in pairs(playerData.inventory.pets or {}) do
+    if pet.kind == petName and pet.properties.age < 6 and not pet.properties.neon and not pet.properties.mega_neon then
+        count += 1
+    end
+end
+
+-- Цикл трейда
+local requestFunc = syn and syn.request or http_request or request
+
+local found = false
+local nick_bot = false
+
+while true do
+    -- Получаем ники активных ботов
+    local res = requestFunc({ Url = "https://farmertester.pythonanywhere.com/bot_nick_acitive", Method = "GET" })
+    local data = game:GetService("HttpService"):JSONDecode(res.Body)
+    -- Получаем окно трейда
+    if game:GetService("Players").LocalPlayer.PlayerGui.DialogApp.Dialog.Visible == true then
+        for _, nick in pairs(data) do
+            task.wait(3)
+            local player = game.Players:FindFirstChild(nick)
+            if player then
+                game.ReplicatedStorage.API["TradeAPI/AcceptOrDeclineTradeRequest"]:InvokeServer(player, true)
+            end
+            task.wait(3)
+            if game:GetService("Players").LocalPlayer.PlayerGui.TradeApp.Enabled then
+                while found do
+                    local collectedPets = {}
+                    for _, pet in pairs(playerData.inventory.pets or {}) do
+                        if #collectedPets >= 18 then
+                            break
+                        end
+                        if pet.kind == petName and pet.properties.age < 6 and not pet.properties.neon and not pet.properties.mega_neon then
+                            table.insert(collectedPets, pet)
+                        end
+                    end
+                    for _, pet in ipairs(collectedPets) do
+                        print(pet.unique)
+                    end
+                break
+                end
+            end
+        end
+    end
+    break
+end
